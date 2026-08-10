@@ -6,9 +6,24 @@ Before trusting any of these on a live site, run the smart values through a **Lo
 
 ---
 
-## 1. Add a customer to a JSM organization, skipping those already in one
+## 1. JSM organizations by email domain
 
-There is no public REST API for an organization's **email domain** mappings (feature request CSM-117, unresolved), so domain-based assignment has to be rebuilt in a rule. Membership itself *is* scriptable.
+### 1a. Setting the work item's Organizations field — use the built-in option
+
+**Try this before writing any web request.** The **Create work item**, **Edit work item** and **Transition work item** actions expose an Organizations field option called **"Use reporter's email domain"**:
+
+- it matches against the domains on each organization's **Manage email domains** list — nothing else
+- exact match on **one** organization → that organization is selected
+- domain listed on **several** organizations → one of them is picked arbitrarily
+- domain listed nowhere + **"Create organization if it doesn't exist"** → a new organization is created, named after the domain
+
+That last behaviour is a footgun on a public portal: every unrecognised sender domain spawns an organization. Leave it off unless you mean it.
+
+This sets the **Organizations field on the work item**. It does not add the *user* to the organization — for membership, use 1b.
+
+### 1b. Adding a customer to an organization, skipping those already in one
+
+There is no public REST API for an organization's **email domain** mappings (feature request CSM-117, unresolved), so mapping maintenance stays manual. Membership itself *is* scriptable.
 
 **Shape:** Work item created → Send web request (check) → Advanced compare → Send web request (assign)
 
@@ -37,13 +52,19 @@ Header: `Authorization: Basic <base64 of agentEmail:apiToken>`
 { "accountIds": [{{issue.reporter.accountId.asJsonString}}] }
 ```
 
-**Domain routing** — to pick the org from the reporter's email domain, derive the domain and compare:
+**Domain routing** — where 1a can't be used (it sets the field, not membership) and you need the domain yourself:
 
 ```
 {{issue.reporter.emailAddress.substringAfter("@").toLowerCase()}}
 ```
 
-Returns empty if the reporter's email visibility is "Only you and admins".
+Returns empty if the reporter's email visibility is "Only you and admins" — guard it with `{{…|"unknown"}}` or a *is not empty* condition, otherwise every such reporter routes to the same wrong bucket.
+
+Pair with a **Create lookup table** for the domain → orgId mapping, which keeps the routing in one editable step:
+
+```
+{{orgLookup.get(issue.reporter.emailAddress.substringAfter("@").toLowerCase())}}
+```
 
 > Test whether the assign call is idempotent before building step 3 at all. Atlassian documents the sibling endpoint `POST /servicedesk/{id}/organization` as returning 204 for an existing association, but says nothing of the sort for the add-users endpoint — that asymmetry is worth one curl. If it is idempotent, delete the check and save a web request per run.
 
@@ -217,7 +238,38 @@ Quote anything that can contain spaces, and `urlEncode` it if the JQL is going i
 
 ---
 
-## 10. Make a rule idempotent
+## 10. Read headers out of an attached `.eml`
+
+**Shape:** Work item updated → Issue attachments condition → Send web request (fetch) → Create variable / Comment
+
+Full detail in [attachments.md](attachments.md); this is the assembled version.
+
+**Gate on the file type first** — Issue attachments condition, `filename` *ends with* `.eml`.
+
+**Fetch it.** `{{attachment.content}}` is a URL, so either use it directly or build the endpoint call, which is the safer form because of the redirect:
+
+```
+GET https://<site>.atlassian.net/rest/api/3/attachment/content/{{attachment.first.id}}?redirect=false
+Authorization: Basic <base64 of email:apiToken>
+```
+
+Without `redirect=false` you get a **303** to a temporary media URL. Send web request only handles **JSON and plain-text** response bodies — fine for `.eml`, useless for PDFs or images.
+
+For a large message, add a `Range` header (e.g. `bytes=0-8191`) to pull only the header block.
+
+**Extract.** Works on simple, single-part, 7-bit messages:
+
+```
+{{webhookResponse.body.substringBetween("Subject: ", "\n").trim()}}
+{{webhookResponse.body.match("From: .*<([^>]+)>")}}
+{{webhookResponse.body.substringBefore("\n\n")}}
+```
+
+Stop here. Multipart boundaries, `base64` / `quoted-printable` bodies, folded headers and `=?UTF-8?B?…?=` subjects cannot be handled — there is no decode function. Offload real parsing to a Forge app, ScriptRunner, or an external endpoint.
+
+---
+
+## 11. Make a rule idempotent
 
 Rules re-fire more often than expected — an edit by another rule, a bulk change, a re-import. Cheap guards:
 

@@ -21,6 +21,7 @@ Docs base: `https://support.atlassian.com/cloud-automation/docs/<slug>/`
 | Text functions (substring, replaceAll, match, split, pad, encode) and list functions (join, sum, distinct, first/last, size) | [references/text-and-lists.md](references/text-and-lists.md) |
 | Math expressions `{{#=}}`, numeric comparisons, formatting/currency, all date & time functions | [references/numbers-and-dates.md](references/numbers-and-dates.md) |
 | JSON functions, **advanced field editing** (`update` vs `fields`, per-field-type JSON), Send web request payloads, parsing responses | [references/json-and-rest.md](references/json-and-rest.md) |
+| Attachment metadata, reading file contents (`.eml`, CSV…), attachment triggers/conditions/actions | [references/attachments.md](references/attachments.md) |
 | Triggers/conditions/actions/branches, advanced steps (Loop, Delay until), service limits, permissions, debugging | [references/rule-structure.md](references/rule-structure.md) |
 | Worked end-to-end recipes assembled from the above | [references/recipes.md](references/recipes.md) |
 
@@ -49,6 +50,8 @@ Never "correct" `{{issue.summary}}` to `{{workItem.summary}}` — that value doe
 - **`setTimeZone` ≠ `convertToTimeZone`.** `setTimeZone` relabels the same wall-clock time with a new zone; `convertToTimeZone` actually shifts it. Picking the wrong one is an off-by-hours bug that survives review.
 - **`{{fieldChange}}` holds only the *first* changed field.** For multi-value changes iterate the changelog: `{{#changelog.fixVersion}}{{toString}}{{/}}`.
 - **`{{comment}}` only exists under the Issue commented trigger** — not when a comment happens to be added by another trigger.
+- **`{{attachment.content}}` is a download URL, not file contents** — despite the docs saying "returns the content of the attachment, with binary content rendered as a String". Automation cannot read a file; you must fetch it with Send web request. See [attachments.md](references/attachments.md).
+- **Setting Organizations has a built-in domain option.** Create / Edit / Transition work item offer **"Use reporter's email domain"** on the Organizations field — no web request needed. It reads each organization's *Manage email domains* list.
 - **Lookup issues caps at 100 work items**, silently. Anything past 100 is dropped with no audit-log warning.
 - **A missing value renders as empty, not as an error.** Guard with the default pipe: `{{some.value|"fallback"}}`.
 - **`htmlEncode` should be used in function form** — `{{htmlEncode(issue.summary)}}`. The inline form `{{webhookData.htmlEncode}}` will return a *property named* `htmlEncode` if the payload happens to have one.

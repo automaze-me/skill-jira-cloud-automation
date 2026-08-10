@@ -13,6 +13,7 @@ The UI rule editor is weakest exactly where automation gets useful: composing JS
 | `references/text-and-lists.md` | Text functions, list functions, conditional logic |
 | `references/numbers-and-dates.md` | Math expressions, numeric formatting, the full date/time surface |
 | `references/json-and-rest.md` | JSON functions, advanced field editing per field type, Send web request |
+| `references/attachments.md` | Attachment metadata, reading file contents, `.eml` handling and its limits |
 | `references/rule-structure.md` | Triggers, conditions, branches, advanced steps, service limits, debugging |
 | `references/recipes.md` | Worked end-to-end patterns |
 
@@ -38,6 +39,7 @@ Written against the state of the docs in August 2026, at which point Atlassian h
 ## Caveats
 
 - Smart values can only be validated at runtime. Verify anything load-bearing with a **Log action** on a manual trigger before shipping.
+- `{{attachment.content}}` is a download URL, not file contents — the smart-values doc wording implies otherwise.
 - Atlassian's own docs spell the web-request response smart value both `{{webhookResponse}}` and `{{webResponse}}`. Confirm which your instance emits.
 - Field names differ between company-managed and team-managed projects (`Story Points` vs `Story point estimate`).
 
