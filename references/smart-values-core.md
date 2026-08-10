@@ -158,7 +158,7 @@ Response from **Send web request** with *Wait for response* enabled.
 {{#webhookResponses}}{{someValue.childValue}}{{/}}
 ```
 
-> Naming caveat: Atlassian's JSON-functions and text-fields pages spell this `{{webResponse.body}}`. Both spellings appear in current docs. Verify with a Log action before relying on either.
+> **Naming: both spellings work.** Atlassian's JSON-functions and text-fields pages use `{{webResponse.body}}` while the issues reference uses `{{webhookResponse}}`. Logging `{{webhookResponse.status}}` and `{{webResponse.status}}` side by side returned `200` for **both** — they are aliases, not a docs error. Verified 2026-08-10. Prefer `{{webhookResponse}}`, which is the form the issues reference documents in full.
 
 ### `{{flow}}`
 

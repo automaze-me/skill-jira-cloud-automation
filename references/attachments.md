@@ -52,21 +52,49 @@ Combine with the JQL condition for filename-pattern work. Extension filtering be
 
 ## Reading file contents
 
-Only route: **Send web request** against the REST content endpoint.
+Only route: **Send web request** against the REST content endpoint. Verified working end to end (2026-08-10).
 
 ```
-GET https://<site>.atlassian.net/rest/api/3/attachment/content/<id>?redirect=false
+GET https://api.atlassian.com/ex/jira/<cloudId>/rest/api/3/attachment/content/{{attachment.first.id}}?redirect=false
 Authorization: Basic <base64 of email:apiToken>
+Range: bytes=0-8191          (optional, see below)
 ```
 
-Two details decide whether this works at all:
+Details that decide whether this works at all:
 
+- **Use `{{attachment.first.id}}`, not `{{attachment.first.content}}`.** `content` hands you a *site* URL (`https://<site>.atlassian.net/rest/api/2/attachment/content/<id>`), which scoped tokens reject — see the auth section. `id` is **undocumented but real**; verified returning a numeric ID.
 - **`?redirect=false`** — the default response is **303 See Other** pointing at a temporary media URL. With `redirect=false` you get **200 OK** with the content inline. Do not assume automation follows the 303.
-- **Send web request supports JSON and plain-text response bodies only.** Text formats (`.eml`, `.csv`, `.json`, `.xml`, `.txt`) can land in `{{webhookResponse.body}}`. Binary (PDF, images, Office files) cannot be usefully retrieved this way.
-
-The endpoint honours a **`Range` header** (HTTP byte ranges). For a large file, request only the first few KB — the standard trick for reading mail headers without pulling the whole message.
+- **Send web request supports JSON and plain-text response bodies only.** Text formats (`.eml`, `.csv`, `.json`, `.xml`, `.txt`) land in `{{webhookResponse.body}}`. Binary (PDF, images, Office files) cannot be usefully retrieved this way.
+- **`Range` header works** for byte ranges. A 46 KB `.eml` returned in full with `length` matching the attachment `size` exactly, so the body cap is somewhere above 46 KB — but pulling 46 KB to read 2 KB of headers is waste. `bytes=0-8191` is plenty for a header block.
 
 Permissions: *Browse projects* on the item's project; issue-level security and private-comment restrictions still apply. Scope `read:attachment:jira` (classic: `read:jira-work`).
+
+### Authentication: the two traps
+
+**1. Scoped tokens must use the gateway URL.** Service accounts can only create *scoped* API tokens, and those authenticate **only** against:
+
+```
+https://api.atlassian.com/ex/jira/<cloudId>/rest/api/3/…
+```
+
+Against the site URL they silently fail to authenticate. Find the cloud ID unauthenticated at `https://<site>.atlassian.net/_edge/tenant_info`.
+
+**2. Failed auth disguises itself as a permission error.** The attachment content endpoint *can be accessed anonymously*. A rejected credential therefore does **not** return 401 — the request proceeds as anonymous and returns:
+
+```json
+{"errorMessages":["You do not have permission to view attachment with id: 12345"],"errors":{}}
+```
+
+Which reads like a project-permission problem and is not. **Always canary with `/rest/api/3/myself`**, which cannot be accessed anonymously and so returns an honest `Client must be authenticated to access this resource`:
+
+```
+curl -s --user 'svc@example.com:TOKEN' \
+  'https://api.atlassian.com/ex/jira/<cloudId>/rest/api/3/myself'
+```
+
+A 200 there means token, URL form and scopes are all correct, and any later error is genuinely about permissions.
+
+Third possibility, if the token is blocked outright: `{"message":"An admin blocked your API token access to this product.", "status":403}` — an org authentication policy. Only an org admin can lift it, typically by creating a policy that allows API token access and putting one service account in it. A **Forge app** sidesteps this entirely, since `asApp()` uses app-scoped OAuth rather than a user API token.
 
 Related endpoints:
 
@@ -85,33 +113,53 @@ Related endpoints:
 
 ## Parsing what you fetched
 
-For a **simple, single-part, 7-bit `.eml`**, header extraction is workable:
+### Backslashes do not survive the smart-value parser
+
+**The single most important constraint here.** Any regex construct requiring a backslash — `\n`, `\t`, `\R`, `\s`, `\w`, `\d`, `\p{…}` — silently returns empty inside `match()` and `replaceAll()`. Doubling them (`\\n`) does not help. Verified by testing `\R` (which needs no escaping in Java) alongside `\\n` and `\\t`; all returned empty.
+
+Everything backslash-free works, including inline flags and lookarounds: `(?m)` `(?s)` `^` `$` `.` `*?` `+` `[^>]` `[A-Za-z]` `(?=…)` `(?!…)`.
+
+Consequence: forget `substringBefore("\n\n")` and anything that needs to name a newline. Use `(?m)^` line anchoring instead.
+
+### Extracting headers, including folded ones
+
+RFC 5322 wraps long header values onto continuation lines that start with whitespace. A plain `(?m)^Subject: (.*)` stops at the first newline and silently truncates — a calendar-invite subject loses its time range, and you get a plausible-looking wrong answer.
+
+This pattern handles folded and unfolded headers identically, with no backslashes:
 
 ```
-{{webhookResponse.body.substringBefore("\n\n")}}                     all headers
-{{webhookResponse.body.substringBetween("Subject: ", "\n").trim()}}
-{{webhookResponse.body.match("From: .*<([^>]+)>")}}
-{{webhookResponse.body.match("Date: (.*)")}}
+{{webhookResponse.body.match("(?sm)^Subject: (.*?)(?=^[A-Za-z])")}}
 ```
 
-For CSV:
+- `(?s)` — `.` crosses newlines, so continuation lines are absorbed
+- `(?m)^` in the lookahead — terminate at the next line starting with a **letter**, i.e. the next real header, since continuations start with whitespace
+- non-greedy `(.*?)` — stop at the first such line, not the last
 
-```
-{{webhookResponse.body.split("\n").get(1).split(",").get(2)}}
-```
+Generalised: `(?sm)^HeaderName: (.*?)(?=^[A-Za-z])`. Verified on `Delivered-To`, `From`, `Subject`, `Date`.
 
-For JSON, skip string surgery entirely — `{{jsonStringToObject(webhookResponse.body).some.path}}`.
+The captured value retains the embedded newline and the continuation's leading space. Writing it to a single-line Jira text field collapses that; if you need it clean in a comment, there is no backslash-free whitespace-normalising call, so accept it or offload.
+
+> Don't reach for a shorter duplicate header as a workaround. `Thread-Topic` carries the same text as `Subject` but folds too, and is Exchange-only.
+
+### Multiple matches
+
+`match()` returns a **collection** when the pattern matches more than once, rendering as `[a, b]`. Forwarded mail routinely has two `Subject:` and several `Received:` headers. Append `.first` when you want one.
+
+### Other formats
+
+CSV — no way to name the newline, so split on a line-anchored match rather than `split("\n")`. JSON — skip string surgery entirely: `{{jsonStringToObject(webhookResponse.body).some.path}}`.
 
 ### Where this stops working
 
-Real MIME defeats smart values:
-
-- multipart boundaries and nested parts
+- multipart boundaries and nested parts — an embedded `message/rfc822` (a forwarded or reported mail) means the headers you extract are the **outer** envelope, not the message inside
 - `quoted-printable` and `base64` bodies — **there is no decode function**
-- RFC 5322 folded headers (continuation lines)
 - charset conversion and `=?UTF-8?B?…?=` encoded words
 
-Do not attempt full `.eml` parsing in a rule. Extract headers, or offload.
+Header extraction from the outer envelope: fine. Anything deeper: offload.
+
+### Reading the audit log
+
+The audit log **flattens newlines to spaces** when displaying a logged value. A body printed with `.left(1200)` looks like one long line even though the newlines are intact and `(?m)^` works on it. Don't debug the regex based on how the log renders — test with a known single-line header (`Delivered-To`) and see whether it returns just its value.
 
 ## Offloading
 

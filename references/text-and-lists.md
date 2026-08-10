@@ -67,6 +67,25 @@ All text examples below assume `issue.summary` = `Hello World!`.
 
 Typical uses: pull a version number out of a description, or harvest every email address from a comment.
 
+> **Backslashes do not survive the smart-value parser.** `\n`, `\t`, `\R`, `\s`, `\w`, `\d`, `\p{…}` all return empty inside `match()` and `replaceAll()`, and doubling them (`\\w`) does not help. Verified 2026-08-10.
+>
+> Write patterns with backslash-free constructs — character classes and inline flags cover most of it:
+>
+> | Instead of | Use |
+> |---|---|
+> | `\d` | `[0-9]` |
+> | `\w` | `[A-Za-z0-9_]` |
+> | `\s` | `[ ]`, or a line-anchored `(?m)^` |
+> | `\n` as a terminator | `(?m)$`, or a `(?=^…)` lookahead |
+>
+> Inline flags and lookarounds work fine: `(?m)` `(?s)` `(?i)` `(?=…)` `(?!…)`.
+>
+> The line-anchored lookahead is the general escape from needing to name a newline — it captures across wrapped lines and stops at the next line starting with a letter:
+>
+> ```
+> {{someText.match("(?sm)^Key: (.*?)(?=^[A-Za-z])")}}
+> ```
+
 `quote()` escapes a value so it can be used as a *literal* inside another regex — `\QHello(.*)World!\E`. Use it whenever you interpolate user data into a `match()` or `replaceAll()` pattern.
 
 ### Encoding

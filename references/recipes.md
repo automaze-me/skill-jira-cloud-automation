@@ -127,13 +127,13 @@ Copy a whole list across from the parent (this one *does* overwrite, deliberatel
 Pull a PO number like `PO-4471` out of the description:
 
 ```
-{{issue.description.match(".*(PO-\\d+).*")}}
+{{issue.description.match(".*(PO-[0-9]+).*")}}
 ```
 
-Every email address in the latest comment (returns a collection — iterate it):
+Every email address in the latest comment (returns a collection — iterate it). Note the backslash-free character classes: `\w` does **not** work in smart values, see [text-and-lists.md](text-and-lists.md):
 
 ```
-{{#issue.comments.last.body.match("([\\w.-]+@[\\w.-]+)")}}{{.}}{{^last}}, {{/}}{{/}}
+{{#issue.comments.last.body.match("([A-Za-z0-9._-]+@[A-Za-z0-9.-]+)")}}{{.}}{{^last}}, {{/}}{{/}}
 ```
 
 Everything after a marker line:
@@ -244,28 +244,47 @@ Quote anything that can contain spaces, and `urlEncode` it if the JQL is going i
 
 Full detail in [attachments.md](attachments.md); this is the assembled version.
 
-**Gate on the file type first** — Issue attachments condition, `filename` *ends with* `.eml`.
+Built and verified end to end on a real 46 KB `.eml` (2026-08-10).
 
-**Fetch it.** `{{attachment.content}}` is a URL, so either use it directly or build the endpoint call, which is the safer form because of the redirect:
+**Gate on the file type** — Issue attachments condition on `mimeType` = `message/rfc822`. More reliable than a `.eml` filename suffix; Jira sets it correctly.
+
+**Fetch it** — Send web request, *Wait for response* ticked:
+
+| Field | Value |
+|---|---|
+| URL | `https://api.atlassian.com/ex/jira/<cloudId>/rest/api/3/attachment/content/{{attachment.first.id}}?redirect=false` |
+| Method | `GET` |
+| Body | empty |
+| Headers | `Authorization: Basic <base64 of email:apiToken>` and `Range: bytes=0-8191` |
+
+Three things that are not optional:
+
+- **`{{attachment.first.id}}`, not `{{attachment.first.content}}`** — `content` is a *site* URL, which scoped tokens reject. Get `<cloudId>` from `https://<site>.atlassian.net/_edge/tenant_info`.
+- **`?redirect=false`** — otherwise a 303 to a temporary media URL.
+- **`Range`** — the whole file returns fine (no truncation at 46 KB), but you only need the header block.
+
+Tick **Hidden** on the Authorization value once it works. It's irreversible and lost on export/duplicate, so do it last.
+
+**Extract** — one pattern, folded or not:
 
 ```
-GET https://<site>.atlassian.net/rest/api/3/attachment/content/{{attachment.first.id}}?redirect=false
-Authorization: Basic <base64 of email:apiToken>
+--- extract ---
+delivered: {{webhookResponse.body.match("(?sm)^Delivered-To: (.*?)(?=^[A-Za-z])")}}
+from:      {{webhookResponse.body.match("(?sm)^From: (.*?)(?=^[A-Za-z])")}}
+subject:   {{webhookResponse.body.match("(?sm)^Subject: (.*?)(?=^[A-Za-z])")}}
+date:      {{webhookResponse.body.match("(?sm)^Date: (.*?)(?=^[A-Za-z])")}}
+--- end ---
 ```
 
-Without `redirect=false` you get a **303** to a temporary media URL. Send web request only handles **JSON and plain-text** response bodies — fine for `.eml`, useless for PDFs or images.
+`(?s)` absorbs continuation lines; the `(?m)^[A-Za-z]` lookahead stops at the next real header. **Do not** use `(?m)^Subject: (.*)` — it truncates folded values and gives a plausible wrong answer (a calendar-invite subject silently loses its time range).
 
-For a large message, add a `Range` header (e.g. `bytes=0-8191`) to pull only the header block.
+**Debugging notes from the build:**
 
-**Extract.** Works on simple, single-part, 7-bit messages:
+- The audit log flattens newlines to spaces on display. The body is fine; don't rewrite the regex because the log looks like one line.
+- Test auth with `/rest/api/3/myself`, never the attachment endpoint — that one allows anonymous access and disguises auth failure as a permission error.
+- `match()` returns `[a, b]` when a header appears twice (common in forwarded mail). Append `.first`.
 
-```
-{{webhookResponse.body.substringBetween("Subject: ", "\n").trim()}}
-{{webhookResponse.body.match("From: .*<([^>]+)>")}}
-{{webhookResponse.body.substringBefore("\n\n")}}
-```
-
-Stop here. Multipart boundaries, `base64` / `quoted-printable` bodies, folded headers and `=?UTF-8?B?…?=` subjects cannot be handled — there is no decode function. Offload real parsing to a Forge app, ScriptRunner, or an external endpoint.
+**Ceiling:** these are the *outer* envelope's headers. A forwarded or reported mail sits inside as an embedded `message/rfc822`, and reaching its headers means walking MIME boundaries — plus `base64` / `quoted-printable` decoding that smart values cannot do. Offload to Forge or ScriptRunner at that point.
 
 ---
 
