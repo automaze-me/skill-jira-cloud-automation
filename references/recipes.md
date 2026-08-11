@@ -255,13 +255,13 @@ Built and verified end to end on a real 46 KB `.eml` (2026-08-10).
 | URL | `https://api.atlassian.com/ex/jira/<cloudId>/rest/api/3/attachment/content/{{attachment.first.id}}?redirect=false` |
 | Method | `GET` |
 | Body | empty |
-| Headers | `Authorization: Basic <base64 of email:apiToken>` and `Range: bytes=0-8191` |
+| Headers | `Authorization: Basic <base64 of email:apiToken>` and `Range: bytes=0-16383` |
 
 Three things that are not optional:
 
 - **`{{attachment.first.id}}`, not `{{attachment.first.content}}`** — `content` is a *site* URL, which scoped tokens reject. Get `<cloudId>` from `https://<site>.atlassian.net/_edge/tenant_info`.
 - **`?redirect=false`** — otherwise a 303 to a temporary media URL.
-- **`Range`** — the whole file returns fine (no truncation at 46 KB), but you only need the header block.
+- **`Range`** — the whole file returns fine (no truncation at 46 KB), but you only need the header block. Don't trim it too far: a measured M365-via-Gmail message carried an 11,576-byte header block, putting `From:` at byte 5,627. `0-16383` leaves room for an extra hop; a short range fails silently as an empty match.
 
 Tick **Hidden** on the Authorization value once it works. It's irreversible and lost on export/duplicate, so do it last.
 

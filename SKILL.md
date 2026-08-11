@@ -22,6 +22,7 @@ Docs base: `https://support.atlassian.com/cloud-automation/docs/<slug>/`
 | Math expressions `{{#=}}`, numeric comparisons, formatting/currency, all date & time functions | [references/numbers-and-dates.md](references/numbers-and-dates.md) |
 | JSON functions, **advanced field editing** (`update` vs `fields`, per-field-type JSON), Send web request payloads, parsing responses | [references/json-and-rest.md](references/json-and-rest.md) |
 | Attachment metadata, reading file contents (`.eml`, CSV…), attachment triggers/conditions/actions | [references/attachments.md](references/attachments.md) |
+| AI steps: **Use Rovo** vs **Use Rovo agent**, `{{rovoResponse}}` / `{{agentResponse}}`, parsing a JSON answer, credit consumption | [references/rovo.md](references/rovo.md) |
 | Triggers/conditions/actions/branches, advanced steps (Loop, Delay until), service limits, permissions, debugging | [references/rule-structure.md](references/rule-structure.md) |
 | Worked end-to-end recipes assembled from the above | [references/recipes.md](references/recipes.md) |
 
@@ -58,6 +59,7 @@ Never "correct" `{{issue.summary}}` to `{{workItem.summary}}` — that value doe
 - **A missing value renders as empty, not as an error.** Guard with the default pipe: `{{some.value|"fallback"}}`.
 - **`htmlEncode` should be used in function form** — `{{htmlEncode(issue.summary)}}`. The inline form `{{webhookData.htmlEncode}}` will return a *property named* `htmlEncode` if the payload happens to have one.
 - **Advanced steps are Premium/Enterprise only** (Branch with conditions, Delay until, Loop). Loop repeats a maximum of 3 times and its conditions can only see trigger context + declared loop inputs.
+- **There are two AI steps and they populate different smart values.** *Use Rovo* → `{{rovoResponse}}`; *Use Rovo agent* → `{{agentResponse}}`. Crossing them renders empty. Text functions applied directly to either return blank — store the answer with **Create variable** first. See [rovo.md](references/rovo.md).
 
 ## Testing any smart value
 

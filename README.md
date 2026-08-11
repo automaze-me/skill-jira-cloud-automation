@@ -14,6 +14,7 @@ The UI rule editor is weakest exactly where automation gets useful: composing JS
 | `references/numbers-and-dates.md` | Math expressions, numeric formatting, the full date/time surface |
 | `references/json-and-rest.md` | JSON functions, advanced field editing per field type, Send web request |
 | `references/attachments.md` | Attachment metadata, reading file contents, `.eml` handling and its limits |
+| `references/rovo.md` | AI steps: Use Rovo vs Use Rovo agent, response smart values, JSON parsing, credits |
 | `references/rule-structure.md` | Triggers, conditions, branches, advanced steps, service limits, debugging |
 | `references/recipes.md` | Worked end-to-end patterns |
 

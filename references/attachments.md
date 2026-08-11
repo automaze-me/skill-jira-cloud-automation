@@ -57,7 +57,7 @@ Only route: **Send web request** against the REST content endpoint. Verified wor
 ```
 GET https://api.atlassian.com/ex/jira/<cloudId>/rest/api/3/attachment/content/{{attachment.first.id}}?redirect=false
 Authorization: Basic <base64 of email:apiToken>
-Range: bytes=0-8191          (optional, see below)
+Range: bytes=0-16383         (optional, see below)
 ```
 
 Details that decide whether this works at all:
@@ -65,7 +65,8 @@ Details that decide whether this works at all:
 - **Use `{{attachment.first.id}}`, not `{{attachment.first.content}}`.** `content` hands you a *site* URL (`https://<site>.atlassian.net/rest/api/2/attachment/content/<id>`), which scoped tokens reject — see the auth section. `id` is **undocumented but real**; verified returning a numeric ID.
 - **`?redirect=false`** — the default response is **303 See Other** pointing at a temporary media URL. With `redirect=false` you get **200 OK** with the content inline. Do not assume automation follows the 303.
 - **Send web request supports JSON and plain-text response bodies only.** Text formats (`.eml`, `.csv`, `.json`, `.xml`, `.txt`) land in `{{webhookResponse.body}}`. Binary (PDF, images, Office files) cannot be usefully retrieved this way.
-- **`Range` header works** for byte ranges. A 46 KB `.eml` returned in full with `length` matching the attachment `size` exactly, so the body cap is somewhere above 46 KB — but pulling 46 KB to read 2 KB of headers is waste. `bytes=0-8191` is plenty for a header block.
+- **`Range` header works** for byte ranges. A 46 KB `.eml` returned in full with `length` matching the attachment `size` exactly, so the body cap is somewhere above 46 KB — but pulling 46 KB to read a header block is waste.
+- **Size the range from a real message, not from intuition.** "A couple of KB of headers" is wrong for modern mail. On a Microsoft 365 message delivered through Gmail, the header block measured **11,576 bytes**: two ARC sets (one per hop), a DKIM signature, and four `Received:` lines. `From:` sat at byte 5,627 and `Subject:` at 5,709, so an 8 KB range happened to capture them with about 2 KB to spare — one extra hop and it would not have. **Use `bytes=0-16383`.** A truncated range does not error; the regex simply matches nothing.
 
 Permissions: *Browse projects* on the item's project; issue-level security and private-comment restrictions still apply. Scope `read:attachment:jira` (classic: `read:jira-work`).
 
