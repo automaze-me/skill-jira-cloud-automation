@@ -49,9 +49,9 @@ Branches over JQL or related items run **in parallel and asynchronously**. Do no
 | Step | Smart values | Notes |
 |---|---|---|
 | **Branch at the same time** | — | runs several groups in parallel |
-| **Branch with conditions** | yes | up to 3 branches + optional fallback; **only the first matching branch runs**; AND/OR execution mode per branch |
-| **Delay until** | no (outputs: yes) | 10 seconds – 90 days, or wait for an event (Work item updated, Alert updated, Incoming webhook) |
-| **Loop** | yes | repeats **max 3 times**; up to 32 conditions |
+| **Branch with conditions** | yes | up to 3 branches + optional fallback; **only the first matching branch runs**; AND/OR execution mode per branch. Jira and JSM only |
+| **Delay until** | no (outputs: yes) | 10 seconds – 90 days, or wait for an event (Work item updated, Alert updated, Incoming webhook). Must sit **before** any condition or action in its group |
+| **Loop** | yes | repeats **max 3 times**; up to 32 conditions; optional **Run steps once before first loop**. Jira, JSM and Confluence |
 
 Adding any advanced step wraps all steps in a **flow group**.
 
