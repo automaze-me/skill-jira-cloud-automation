@@ -240,7 +240,7 @@ The editor warning *"Valid JSON but smart value can't be validated"* is **expect
 ## Send web request
 
 - Smart values are supported in URL, headers, and body.
-- Enable **Wait for response** to get `{{webhookResponse}}` (see smart-values-core.md for the `webResponse` naming caveat).
+- Enable **Wait for response** to get `{{webResponse}}` (see smart-values-core.md for the `webResponse` naming caveat).
 - Calls back to your own Jira site are **not implicitly authenticated** — supply `Authorization: Basic <base64 of email:apiToken>` yourself.
 - Global admins can restrict which domains this action may reach.
 - Outbound traffic comes from Atlassian IP ranges; the target must allow them.
@@ -250,14 +250,14 @@ Payload shape is configurable — `issue-data-jira-format-payload-for-send-web-r
 ### Reading a response
 
 ```
-{{webhookResponse.status}}
-{{webhookResponse.body.values.id}}
-{{webhookResponse.body.size}}
-{{#webhookResponses}}{{someValue.childValue}}{{/}}
+{{webResponse.status}}
+{{webResponse.body.values.id}}
+{{webResponse.body.size}}
+{{#webResponses}}{{someValue.childValue}}{{/}}
 ```
 
 Paged Jira REST responses (`{size, start, limit, values[]}`) work well with `.size` for existence checks and `{{…values.id}}` to flatten a list of IDs for a "does not contain" comparison.
 
 ### Guarding a call
 
-The **Advanced compare condition** is where response-based branching happens: first value `{{webhookResponse.body.size}}`, condition `equals`, second value `0`. Flattened list membership works the same way with *contains* / *does not contain*.
+The **Advanced compare condition** is where response-based branching happens: first value `{{webResponse.body.size}}`, condition `equals`, second value `0`. Flattened list membership works the same way with *contains* / *does not contain*.

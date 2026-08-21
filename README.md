@@ -41,7 +41,7 @@ Written against the state of the docs in August 2026, at which point Atlassian h
 
 - Smart values can only be validated at runtime. Verify anything load-bearing with a **Log action** on a manual trigger before shipping.
 - `{{attachment.content}}` is a download URL, not file contents — the smart-values doc wording implies otherwise.
-- Atlassian's own docs spell the web-request response smart value both `{{webhookResponse}}` and `{{webResponse}}`. Confirm which your instance emits.
+- The web-request response smart value is `{{webResponse}}`. Atlassian's docs long spelled it `{{webhookResponse}}` too; that alias stopped populating in August 2026 and renders empty rather than erroring.
 - Field names differ between company-managed and team-managed projects (`Story Points` vs `Story point estimate`).
 
 ## Licence

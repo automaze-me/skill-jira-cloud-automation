@@ -17,7 +17,7 @@ Docs base: `https://support.atlassian.com/cloud-automation/docs/<slug>/`
 
 | Question | File |
 |---|---|
-| Syntax rules, root objects (`{{issue}}`, `{{lookupIssues}}`, `{{webhookResponse}}`, `{{changelog}}`…), iteration, defaults, variables, how to test a value | [references/smart-values-core.md](references/smart-values-core.md) |
+| Syntax rules, root objects (`{{issue}}`, `{{lookupIssues}}`, `{{webResponse}}`, `{{changelog}}`…), iteration, defaults, variables, how to test a value | [references/smart-values-core.md](references/smart-values-core.md) |
 | Text functions (substring, replaceAll, match, split, pad, encode) and list functions (join, sum, distinct, first/last, size) | [references/text-and-lists.md](references/text-and-lists.md) |
 | Math expressions `{{#=}}`, numeric comparisons, formatting/currency, all date & time functions | [references/numbers-and-dates.md](references/numbers-and-dates.md) |
 | JSON functions, **advanced field editing** (`update` vs `fields`, per-field-type JSON), Send web request payloads, parsing responses | [references/json-and-rest.md](references/json-and-rest.md) |
@@ -47,7 +47,7 @@ Never "correct" `{{issue.summary}}` to `{{workItem.summary}}` — that value doe
 - **`asJsonArray` is numbers-only.** Text lists silently render wrong; use `asJsonStringArray` for text. See [json-and-rest.md](references/json-and-rest.md).
 - **Never put the same field in both `update` and `fields`** in advanced field editing — `fields` is just shorthand for `update` + `set`, and using both errors.
 - **User fields need `{"id": "<accountId>"}`**, never `name` — GDPR change. `{{initiator.accountId.asJsonObject("id")}}` builds it correctly and escapes it.
-- **`{{webhookResponse}}` and `{{webResponse}}` are aliases** — both populate, verified by logging them side by side. The docs' inconsistent spelling is not a bug. Prefer `{{webhookResponse}}`.
+- **The web-request response is `{{webResponse}}`. `{{webhookResponse}}` is dead.** The old name was an accepted alias until recently and now renders empty. That failure is quiet: `{{webhookResponse.status}}` returns nothing rather than erroring, so an `equals 200` check just fails and the rule takes its error branch as though the request had failed. Any rule written before this needs every reference renamed. Both spellings were logged returning `200` on 2026-08-10; on 2026-08-21 only `{{webResponse}}` populated, so the alias was retired between those dates.
 - **Backslashes die in the smart-value parser.** `\n`, `\t`, `\R`, `\s`, `\w`, `\d` all return empty inside `match()` / `replaceAll()`, and doubling doesn't help. Use `[0-9]`, `[A-Za-z0-9_]`, and `(?m)^` anchoring instead of naming a newline. See [text-and-lists.md](references/text-and-lists.md).
 - **Calling your own site's REST API needs the gateway URL if the token is scoped.** Service accounts can only make scoped tokens, and those authenticate solely against `https://api.atlassian.com/ex/jira/<cloudId>/…`. Worse, endpoints that allow anonymous access return a *permission* error rather than 401 when auth fails — canary with `/rest/api/3/myself`. See [attachments.md](references/attachments.md).
 - **`setTimeZone` ≠ `convertToTimeZone`.** `setTimeZone` relabels the same wall-clock time with a new zone; `convertToTimeZone` actually shifts it. Picking the wrong one is an off-by-hours bug that survives review.

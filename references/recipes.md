@@ -2,7 +2,7 @@
 
 Worked end-to-end patterns. Each states the rule shape, then the exact values to paste.
 
-Before trusting any of these on a live site, run the smart values through a **Log action** on a manual trigger — instance-specific field names and the `webhookResponse` / `webResponse` naming difference both bite here.
+Before trusting any of these on a live site, run the smart values through a **Log action** on a manual trigger — instance-specific field names bite here, and so does anything copied from an older rule still referencing `{{webhookResponse}}`, which now renders empty.
 
 ---
 
@@ -41,8 +41,8 @@ Header: `Authorization: Basic <base64 of agentEmail:apiToken>`
 
 | Goal | First value | Condition | Second value |
 |---|---|---|---|
-| in *no* organization | `{{webhookResponse.body.size}}` | equals | `0` |
-| not in *this* organization | `{{webhookResponse.body.values.id}}` | does not contain | `<orgId>` |
+| in *no* organization | `{{webResponse.body.size}}` | equals | `0` |
+| not in *this* organization | `{{webResponse.body.values.id}}` | does not contain | `<orgId>` |
 
 `{{…values.id}}` flattens the paged result to a comma-separated list of IDs, which is what makes *does not contain* work.
 
@@ -153,19 +153,19 @@ When interpolating user data into a pattern, wrap it in `quote()` so regex metac
 If the body arrives as an object, address it directly:
 
 ```
-{{webhookResponse.body.data.customerTier}}
+{{webResponse.body.data.customerTier}}
 ```
 
 If it arrives as a *string*, convert first:
 
 ```
-{{jsonStringToObject(webhookResponse.body).data.customerTier}}
+{{jsonStringToObject(webResponse.body).data.customerTier}}
 ```
 
 Then gate on it:
 
 ```
-{{#if(equals(jsonStringToObject(webhookResponse.body).data.customerTier, "enterprise"))}}
+{{#if(equals(jsonStringToObject(webResponse.body).data.customerTier, "enterprise"))}}
 Escalating — enterprise customer.
 {{/}}
 ```
@@ -173,7 +173,7 @@ Escalating — enterprise customer.
 Guard against a failed call before reading the body:
 
 ```
-{{#if(equals(webhookResponse.status, 200))}}…{{/}}
+{{#if(equals(webResponse.status, 200))}}…{{/}}
 ```
 
 ---
@@ -269,10 +269,10 @@ Tick **Hidden** on the Authorization value once it works. It's irreversible and 
 
 ```
 --- extract ---
-delivered: {{webhookResponse.body.match("(?sm)^Delivered-To: (.*?)(?=^[A-Za-z])")}}
-from:      {{webhookResponse.body.match("(?sm)^From: (.*?)(?=^[A-Za-z])")}}
-subject:   {{webhookResponse.body.match("(?sm)^Subject: (.*?)(?=^[A-Za-z])")}}
-date:      {{webhookResponse.body.match("(?sm)^Date: (.*?)(?=^[A-Za-z])")}}
+delivered: {{webResponse.body.match("(?sm)^Delivered-To: (.*?)(?=^[A-Za-z])")}}
+from:      {{webResponse.body.match("(?sm)^From: (.*?)(?=^[A-Za-z])")}}
+subject:   {{webResponse.body.match("(?sm)^Subject: (.*?)(?=^[A-Za-z])")}}
+date:      {{webResponse.body.match("(?sm)^Date: (.*?)(?=^[A-Za-z])")}}
 --- end ---
 ```
 

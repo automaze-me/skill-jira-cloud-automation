@@ -145,20 +145,24 @@ The changed field, anywhere smart values are supported.
 
 Body and payload of the **Incoming webhook** trigger. Access with dot notation: `{{webhookData.issue.key}}`. If it arrives as a JSON *string* rather than an object, run it through `jsonStringToObject()` — see json-and-rest.md.
 
-### `{{webhookResponse}}`
+### `{{webResponse}}`
 
 Response from **Send web request** with *Wait for response* enabled.
 
 ```
-{{webhookResponse.status}}                    e.g. 200
-{{webhookResponse.headers.Content-Type}}
-{{webhookResponse.body}}
-{{webhookResponse.body.name}}
-{{webhookResponses.last.body}}                when the action ran over a list
-{{#webhookResponses}}{{someValue.childValue}}{{/}}
+{{webResponse.status}}                    e.g. 200
+{{webResponse.headers.Content-Type}}
+{{webResponse.body}}
+{{webResponse.body.name}}
+{{webResponses.last.body}}                when the action ran over a list
+{{#webResponses}}{{someValue.childValue}}{{/}}
 ```
 
-> **Naming: both spellings work.** Atlassian's JSON-functions and text-fields pages use `{{webResponse.body}}` while the issues reference uses `{{webhookResponse}}`. Logging `{{webhookResponse.status}}` and `{{webResponse.status}}` side by side returned `200` for **both** — they are aliases, not a docs error. Verified 2026-08-10. Prefer `{{webhookResponse}}`, which is the form the issues reference documents in full.
+> **Naming: `{{webhookResponse}}` no longer populates.** Atlassian's docs carried both spellings for a long time, and logging `{{webhookResponse.status}}` beside `{{webResponse.status}}` returned `200` for both on 2026-08-10. On 2026-08-21, on a live tenant, the old name rendered empty while `{{webResponse}}` worked. Use `{{webResponse}}` and nothing else.
+>
+> The retirement is dangerous precisely because it is silent. A missing value renders as empty rather than raising, so `{{webhookResponse.status}}` **equals** `200` simply evaluates false, and a rule that branches on that check runs its failure path on every execution while reporting no error of its own. Rules authored before the change do not break loudly; they start lying.
+>
+> The list form above is written `{{webResponses}}` by extension from the singular. That extension has not been logged since the rename — confirm it with a **Log action** before relying on it in a rule that iterates.
 
 ### `{{flow}}`
 

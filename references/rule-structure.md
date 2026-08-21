@@ -69,7 +69,7 @@ Adding any advanced step wraps all steps in a **flow group**.
 | **Create variable** | defines a reusable value; **always returns a string** |
 | **Lookup issues** | JQL search, **max 100 results**, exposed as `{{lookupIssues}}` |
 | **Re-fetch work item data** | refreshes `{{issue}}`; required after any step whose result a later step must read |
-| **Send web request** | outbound HTTP; enable *Wait for response* for `{{webhookResponse}}` |
+| **Send web request** | outbound HTTP; enable *Wait for response* for `{{webResponse}}` |
 | **Re-fetch alert data** | same as re-fetch, for `{{alert}}`; runs in the background |
 
 ## Service limits
