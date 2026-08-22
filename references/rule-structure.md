@@ -59,7 +59,50 @@ Adding any advanced step wraps all steps in a **flow group**.
 
 **Loop variables** — `loop.count`, `loop.conditionMet` (string `"true"`/`"false"`). Updated only when the loop *completes*, so they are useless inside the loop itself. Loop conditions can read only the trigger context and declared loop inputs — not flow-group outputs, unless those are passed in as inputs.
 
-**Nesting** — max 2 levels. Loops cannot nest inside loops. Permitted: Branch-at-same-time inside Loop, Loop inside Branch-at-same-time, Branch inside Branch (each optionally with Delay until).
+**Nesting** — max 2 levels. Loops cannot nest inside loops. The docs list Branch-inside-Branch among the permitted combinations; **the editor refused it** when tried on a live tenant (2026-08-21). Treat branch-inside-branch as unavailable until your own editor proves otherwise, and see "How steps actually compose" below.
+
+## How steps actually compose
+
+Measured in the editor on a live tenant, 2026-08-21. Two of these contradict the docs, and all four change how a rule has to be laid out.
+
+| Fact | Consequence |
+|---|---|
+| **Branches do not nest inside branches** | One decision point per rule. More decisions means more rules, chained on something durable. |
+| **Branch conditions evaluate when the branch step is reached** | Anything you fork on must already exist. A value computed *inside* a branch cannot be branched on in the same rule. |
+| **A bare condition inside a branch stops the rest of that branch only** | It has no else, so it can only stop. Never alert. |
+| **`If/else` caps at 2 nested layers** | Shipped Nov 2024 ([AUTO-67](https://jira.atlassian.com/browse/AUTO-67), 372 votes, Fixed). Deeper guard chains are not buildable. |
+
+Two rules follow, and they are the whole trick to laying out a non-trivial flow:
+
+- **Gather in the trunk, fork once.** Every web request, edit and re-fetch goes above the branch step.
+- **Branches alert, bare conditions stop.** Spend a branch only on an outcome that needs an action; use a bare condition for anything meant to end quietly.
+
+When one rule runs out of branches, split at a **field change** and let the next rule trigger on it — the second rule needs **"Allow other rules to trigger this rule"** enabled or the chain silently does nothing.
+
+## Condition failure is group-scoped
+
+**"Add criteria to determine if the flow continues running just for the steps in a flow group. Only applies when using advanced steps."** — Atlassian, *Use automation steps in a flow*.
+
+The *Add conditions to an automation flow* page says the opposite in three words: "the flow stops running." The first is what happens once advanced steps are in play; the second describes a rule with no flow groups in it. Nothing on either page cross-references the other, which is why this reads as a bug the first time it bites.
+
+## Variables are scoped to their group
+
+A variable created inside a group, branch or `If/else` block is gone outside it — [AUTO-154](https://jira.atlassian.com/browse/AUTO-154), 155 votes, still open, filed as a **Suggestion** rather than a Bug. The sanctioned mechanism for crossing a group boundary is the group's own **inputs and outputs**.
+
+**The better pattern for anything non-trivial: put the state on the work item.** Write it to a field, **Re-fetch work item data**, then read `{{issue.…}}` anywhere — including in later rules. Fields are global scope, survive the rule ending, and leave an inspectable record of what the rule decided months later.
+
+An **Assets object field can be set from an AQL query** in Edit work item, which replaces the Lookup objects action outright:
+
+```
+Edit work item → <assets field> → objectTypeId = 46 AND "email-domains" LIKE ",{{issue."Domain"}},"
+Re-fetch work item data
+{{issue.customfield_10246."jsm-organization-id"}}     reads an attribute off the match
+{{issue.customfield_10246.size}}                      the field is MULTI-VALUE — check this
+```
+
+That field holds every matching object, so an AQL matching two objects assigns neither cleanly. Branch on `.size`, not on whether it is empty.
+
+**Quote any field name containing a space**: `{{issue."Initial Reporter Email Domain"}}`. Unquoted it renders empty, like every other parser failure here.
 
 ## Actions worth knowing
 

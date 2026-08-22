@@ -241,6 +241,7 @@ The editor warning *"Valid JSON but smart value can't be validated"* is **expect
 
 - Smart values are supported in URL, headers, and body.
 - Enable **Wait for response** to get `{{webResponse}}` (see smart-values-core.md for the `webResponse` naming caveat).
+- A **checkbox decides whether a non-2xx response fails the rule or lets execution continue.** Continue when a later branch reads `{{webResponse.status}}` and alerts on it; fail when the audit log and the rule owner's error notification are where the failure should land. Note the branch has to sit *after* the request but the status has to exist *before* the branch step, so a request whose failure you want to alert on belongs in the trunk.
 - Calls back to your own Jira site are **not implicitly authenticated** — supply `Authorization: Basic <base64 of email:apiToken>` yourself.
 - Global admins can restrict which domains this action may reach.
 - Outbound traffic comes from Atlassian IP ranges; the target must allow them.
@@ -261,3 +262,27 @@ Paged Jira REST responses (`{size, start, limit, values[]}`) work well with `.si
 ### Guarding a call
 
 The **Advanced compare condition** is where response-based branching happens: first value `{{webResponse.body.size}}`, condition `equals`, second value `0`. Flattened list membership works the same way with *contains* / *does not contain*.
+
+### Getting a JSM customer's email address
+
+`{{issue.reporter.emailAddress}}` renders **empty** for JSM customer accounts, whoever the actor is — verified with both the *Automation for Jira* default actor and a full org admin. Email visibility is a per-account profile setting, and for customers on domains your org has not claimed, nobody on your side can change it. No actor, permission or scope fixes the smart value.
+
+Fetch it with a web request instead:
+
+```
+GET https://api.atlassian.com/ex/jira/<cloudId>/rest/servicedeskapi/servicedesk/<projectKey>/customer?query={{issue.reporter.accountId.urlEncode}}
+Accept: application/json
+X-ExperimentalApi: opt-in
+```
+
+```
+{{webResponse.body.values.first.emailAddress}}
+```
+
+- Scope: `manage:servicedesk-customer`. The endpoint is flagged **Experimental**, hence the header.
+- `emailAddress` is in its **documented** response schema, unlike the other routes below.
+- The service desk is addressed by **project key**; a numeric project ID returns "service space does not exist".
+- Note the paged envelope — `.values.first`, not `.first`.
+- Matching an `accountId` through `query` is undocumented (the docs describe `query` as matching name and email). The same behaviour holds on `/rest/api/3/user/search?query=<accountId>`, which suggests a shared search backend rather than a fluke.
+
+Three sibling routes return the user **without** `emailAddress`, all verified on the same token and account: `/rest/api/3/user?accountId=`, `/rest/api/3/user/bulk?accountId=`, and `/rest/api/3/user/search?accountId=`. Only the `query=` form carries it. `/rest/api/3/user/email` is the documented endpoint for this and needs a scope most tokens lack; it is also limited to managed accounts, so it will not help for external customers.
