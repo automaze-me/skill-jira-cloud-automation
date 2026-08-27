@@ -49,7 +49,7 @@ Branches over JQL or related items run **in parallel and asynchronously**. Do no
 | Step | Smart values | Notes |
 |---|---|---|
 | **Branch at the same time** | — | runs several groups in parallel |
-| **Branch with conditions** | yes | up to 3 branches + optional fallback; **only the first matching branch runs**; AND/OR execution mode per branch. Jira and JSM only |
+| **Branch with conditions** | yes | up to 3 branches + optional fallback; **only the first matching branch runs**; AND/OR execution mode per branch; **the fallback takes no conditions** — see below. Jira and JSM only |
 | **Delay until** | no (outputs: yes) | 10 seconds – 90 days, or wait for an event (Work item updated, Alert updated, Incoming webhook). Must sit **before** any condition or action in its group |
 | **Loop** | yes | repeats **max 3 times**; up to 32 conditions; optional **Run steps once before first loop**. Jira, JSM and Confluence |
 
@@ -70,12 +70,28 @@ Measured in the editor on a live tenant, 2026-08-21. Two of these contradict the
 | **Branches do not nest inside branches** | One decision point per rule. More decisions means more rules, chained on something durable. |
 | **Branch conditions evaluate when the branch step is reached** | Anything you fork on must already exist. A value computed *inside* a branch cannot be branched on in the same rule. |
 | **A bare condition inside a branch stops the rest of that branch only** | It has no else, so it can only stop. Never alert. |
+| **The fallback branch takes no conditions** | The UI states it outright: *"Runs when no conditions are met."* Every guard has to be spent as one of the three conditional branches. |
 | **`If/else` caps at 2 nested layers** | Shipped Nov 2024 ([AUTO-67](https://jira.atlassian.com/browse/AUTO-67), 372 votes, Fixed). Deeper guard chains are not buildable. |
 
 Two rules follow, and they are the whole trick to laying out a non-trivial flow:
 
 - **Gather in the trunk, fork once.** Every web request, edit and re-fetch goes above the branch step.
 - **Branches alert, bare conditions stop.** Spend a branch only on an outcome that needs an action; use a bare condition for anything meant to end quietly.
+
+### The fallback is unguarded, so budget the three branches for stops too
+
+The fallback is the only unconditional path out of a `Branch with conditions`, which means it runs for *everything* the three conditions did not catch. A case that should end silently cannot be filtered out down there — it has to be caught above, as a branch whose condition matches it and whose body does nothing but a Log action.
+
+Three conditional branches, and both the alerts and the silent stops come out of the same three. Combine stops with OR execution mode to save slots:
+
+```
+1  <alert condition A>              → Slack
+2  <alert condition B>              → Slack
+3  <stop condition C> OR <stop D>   → Log "no action: expected case"
+   fallback                         → the write
+```
+
+Put the stop conditions in the fallback instead and the write happens for cases it was never meant to touch. Which is silent, and reads in the audit log as a completed run.
 
 When one rule runs out of branches, split at a **field change** and let the next rule trigger on it — the second rule needs **"Allow other rules to trigger this rule"** enabled or the chain silently does nothing.
 
