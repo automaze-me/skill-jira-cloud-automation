@@ -101,11 +101,31 @@ When one rule runs out of branches, split at a **field change** and let the next
 
 The *Add conditions to an automation flow* page says the opposite in three words: "the flow stops running." The first is what happens once advanced steps are in play; the second describes a rule with no flow groups in it. Nothing on either page cross-references the other, which is why this reads as a bug the first time it bites.
 
-## Variables are scoped to their group
+## Variables are scoped to their group — and so is `{{webResponse}}`
 
 A variable created inside a group, branch or `If/else` block is gone outside it — [AUTO-154](https://jira.atlassian.com/browse/AUTO-154), 155 votes, still open, filed as a **Suggestion** rather than a Bug. The sanctioned mechanism for crossing a group boundary is the group's own **inputs and outputs**.
 
-**The better pattern for anything non-trivial: put the state on the work item.** Write it to a field, **Re-fetch work item data**, then read `{{issue.…}}` anywhere — including in later rules. Fields are global scope, survive the rule ending, and leave an inspectable record of what the rule decided months later.
+**`{{webResponse}}` obeys the same rule, in the direction that hurts.** A Send web request in the trunk populates it; a branch below cannot read it. Measured on a live tenant with two Log actions, one step apart:
+
+```
+last step before the branch    memb status: 200      memb size: 1
+first step inside a branch     memb status: EMPTY    memb size: EMPTY
+```
+
+This is worth more attention than the variable case, because the branch *condition* reads it too. `{{webResponse.status}}` **does not equal** `200` evaluates `EMPTY != 200` → **true**, so a branch meant to catch HTTP failures fires on every single run, reporting a failure that never happened. Nothing in the audit log mentions an unresolved smart value; the branch simply looks like it matched.
+
+The corollary is a hard rule: **a branch condition may only read `{{issue.…}}`.** Anything a web request produced has to be written to a field in the trunk first.
+
+**The general pattern: put the state on the work item.** Write it to a field, **Re-fetch work item data**, then read `{{issue.…}}` anywhere — including in later rules. Fields are global scope, survive the rule ending, and leave an inspectable record of what the rule decided months later.
+
+Pack several response facts into one field rather than minting a field each. A status and a result count as `{{webResponse.status}}:{{webResponse.body.size}}` gives `200:0`, `200:1`, `401:` — every branch you need, off one text field, using `contains` and `equals`:
+
+```
+Edit work item → <check field> → {{webResponse.status}}:{{webResponse.body.size}}
+Re-fetch work item data
+branch 1:  {{issue."<check field>"}}  does not contain  200:     ← the call failed
+branch 2:  {{issue."<check field>"}}  does not equal    200:0    ← it succeeded, result non-empty
+```
 
 An **Assets object field can be set from an AQL query** in Edit work item, which replaces the Lookup objects action outright:
 

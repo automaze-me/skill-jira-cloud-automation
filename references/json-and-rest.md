@@ -241,7 +241,8 @@ The editor warning *"Valid JSON but smart value can't be validated"* is **expect
 
 - Smart values are supported in URL, headers, and body.
 - Enable **Wait for response** to get `{{webResponse}}` (see smart-values-core.md for the `webResponse` naming caveat).
-- A **checkbox decides whether a non-2xx response fails the rule or lets execution continue.** Continue when a later branch reads `{{webResponse.status}}` and alerts on it; fail when the audit log and the rule owner's error notification are where the failure should land. Note the branch has to sit *after* the request but the status has to exist *before* the branch step, so a request whose failure you want to alert on belongs in the trunk.
+- A **checkbox decides whether a non-2xx response fails the rule or lets execution continue.** Continue when the status is meant to be alerted on; fail when the audit log and the rule owner's error notification are where the failure should land.
+- **`{{webResponse}}` does not survive into a branch** — it is group-scoped like a variable, and a branch condition reading it gets `EMPTY`. Put the request in the trunk, write `{{webResponse.status}}:{{webResponse.body.size}}` to a work item field, **Re-fetch work item data**, and branch on the field. See rule-structure.md.
 - Calls back to your own Jira site are **not implicitly authenticated** — supply `Authorization: Basic <base64 of email:apiToken>` yourself.
 - Global admins can restrict which domains this action may reach.
 - Outbound traffic comes from Atlassian IP ranges; the target must allow them.
