@@ -110,7 +110,7 @@ A variable created inside a group, branch or `If/else` block is gone outside it 
 An **Assets object field can be set from an AQL query** in Edit work item, which replaces the Lookup objects action outright:
 
 ```
-Edit work item → <assets field> → objectTypeId = 46 AND "email-domains" LIKE ",{{issue."Domain"}},"
+Edit work item → <assets field> → objectTypeId = 46 AND "email-domains" LIKE ",{{issue.customfield_10312}},"
 Re-fetch work item data
 {{issue.customfield_10246."jsm-organization-id"}}     reads an attribute off the match
 {{issue.customfield_10246.size}}                      the field is MULTI-VALUE — check this
@@ -119,6 +119,8 @@ Re-fetch work item data
 That field holds every matching object, so an AQL matching two objects assigns neither cleanly. Branch on `.size`, not on whether it is empty.
 
 **Quote any field name containing a space**: `{{issue."Initial Reporter Email Domain"}}`. Unquoted it renders empty, like every other parser failure here.
+
+**But never inside an AQL or JQL string literal.** `LIKE ",{{issue."Some Field"}},"` puts a `"` inside a `"…"`, and AQL accepts **double quotes only** — single quotes are a syntax error, verified against a live workspace, so there is no alternative quote to escape with. Use the `customfield_NNNNN` form there instead; it needs no quotes at all. The two forms are otherwise interchangeable, which is why this only bites in the one place where the field reference is wrapped in a string.
 
 ## Actions worth knowing
 
