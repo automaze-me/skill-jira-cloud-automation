@@ -127,6 +127,8 @@ branch 1:  {{issue."<check field>"}}  does not contain  200:     ← the call fa
 branch 2:  {{issue."<check field>"}}  does not equal    200:0    ← it succeeded, result non-empty
 ```
 
+Before building that, ask whether the status needs to reach a branch at all. Set the request's non-2xx checkbox to **fail the rule** and a failure goes to the audit log and the rule owner's error notification on its own — then the field carries only the result, and the status branch disappears with it. Worth doing whenever the failure is an admin's problem (a bad token, a revoked scope) rather than something the flow can route per work item. Check the rule's **Notify on error** setting is on, or that failure reaches nobody.
+
 An **Assets object field can be set from an AQL query** in Edit work item, which replaces the Lookup objects action outright:
 
 ```
