@@ -49,7 +49,7 @@ Branches over JQL or related items run **in parallel and asynchronously**. Do no
 | Step | Smart values | Notes |
 |---|---|---|
 | **Branch at the same time** | — | runs several groups in parallel |
-| **Branch with conditions** | yes | up to 3 branches + optional fallback; **only the first matching branch runs**; AND/OR execution mode per branch; **the fallback takes no conditions** — see below. Jira and JSM only |
+| **Branch with conditions** | yes | up to 3 branches + optional fallback; **only the first matching branch runs**; AND execution mode per branch, and the reference also lists an OR mode ("At least one condition matches") that was **absent from the editor on a live tenant on 2026-09-11** — do not design around it while a slot is free; **the fallback takes no conditions** — see below. Jira and JSM only |
 | **Delay until** | no (outputs: yes) | 10 seconds – 90 days, or wait for an event (Work item updated, Alert updated, Incoming webhook). Must sit **before** any condition or action in its group |
 | **Loop** | yes | repeats **max 3 times**; up to 32 conditions; optional **Run steps once before first loop**. Jira, JSM and Confluence |
 
@@ -82,7 +82,7 @@ Two rules follow, and they are the whole trick to laying out a non-trivial flow:
 
 The fallback is the only unconditional path out of a `Branch with conditions`, which means it runs for *everything* the three conditions did not catch. A case that should end silently cannot be filtered out down there — it has to be caught above, as a branch whose condition matches it and whose body does nothing but a Log action.
 
-Three conditional branches, and both the alerts and the silent stops come out of the same three. Combine stops with OR execution mode to save slots:
+Three conditional branches, and both the alerts and the silent stops come out of the same three. If the editor offers the OR execution mode (documented, but missing on one tenant on 2026-09-11), combine stops under it to save slots; otherwise give each stop its own branch, which also makes the audit log name the guard that fired:
 
 ```
 1  <alert condition A>              → Slack
