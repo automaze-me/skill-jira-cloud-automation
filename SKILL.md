@@ -1,13 +1,13 @@
 ---
 name: jira-cloud-automation
-description: Use when building, reviewing, or debugging Jira Cloud automation rules (now called "flows") in the UI editor — writing smart values, manipulating text/lists/numbers/dates, building JSON for advanced field editing or Send web request, wiring Lookup issues / Create variable / branches, or when a rule silently produces an empty value, a wrong type, or stale issue data.
+description: Use when building, reviewing, or debugging Jira Cloud automation rules (now called "flows") in the UI editor or through the automation REST API — writing smart values, manipulating text/lists/numbers/dates, building JSON for advanced field editing or Send web request, wiring Lookup issues / Create variable / branches, or when a rule silently produces an empty value, a wrong type, or stale issue data.
 ---
 
 # Jira Cloud automation — smart values & data manipulation
 
 ## Overview
 
-Look-up skill for authoring Jira Cloud automation in the **UI rule editor**. Its job is to hand over exact, copy-pasteable smart values instead of plausible-looking ones.
+Look-up skill for authoring Jira Cloud automation in the **UI rule editor**, or as rule JSON written through the REST API. Its job is to hand over exact, copy-pasteable smart values and component shapes instead of plausible-looking ones.
 
 Core principle: **look the syntax up, don't recall it.** Smart-value function names are drawn from three different Java libraries (`String`, `StringUtils`, Joda-style date helpers) and are not guessable — `substringBeforeLast` exists, `substringBeforeFirst` does not; `asJsonStringArray` and `asJsonArray` mean different things and silently misrender if swapped.
 
@@ -25,6 +25,7 @@ Docs base: `https://support.atlassian.com/cloud-automation/docs/<slug>/`
 | AI steps: **Use Rovo** vs **Use Rovo agent**, `{{rovoResponse}}` / `{{agentResponse}}`, parsing a JSON answer, credit consumption | [references/rovo.md](references/rovo.md) |
 | Triggers/conditions/actions/branches, advanced steps (Loop, Delay until), service limits, permissions, debugging | [references/rule-structure.md](references/rule-structure.md) |
 | Worked end-to-end recipes assembled from the above | [references/recipes.md](references/recipes.md) |
+| Creating, updating and diffing rules through the **REST API**, the JSON of each trigger, condition, If/else and action, keeping webhook secrets out of scripts | [references/rest-api.md](references/rest-api.md) |
 
 ## Terminology: the 2026 rename
 

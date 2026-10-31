@@ -193,7 +193,7 @@ Symptoms of an actor permission problem: rule reports success, nothing changed; 
 
 ## Import / export
 
-Export produces a JSON file (individual rule, or all rules at once). Import is UI-only — there is **no public REST API to create rules**.
+Export produces a JSON file (individual rule, or all rules at once). Import in the UI takes that file. Separately, a **public REST API** now lists, creates, updates and deletes rules in the same JSON format; see [rest-api.md](rest-api.md).
 
 Constraints that bite:
 - The JSON must come from the **same version** of Jira automation or the import fails
@@ -201,4 +201,4 @@ Constraints that bite:
 - Imported rules arrive **disabled** and must be enabled manually
 - Data Center and Cloud formats differ — cross-import commonly throws `MismatchedInputException`
 
-Practical consequence: to script or clone rules, **build once in the UI, export, then edit that JSON**. Hand-authoring rule JSON from scratch against an undocumented, drifting schema is not worth it.
+Practical consequence: to script rules, take each component's shape from a rule read back from the site (an export, `GET /rule/<uuid>`, or a throwaway probe rule built in the editor), never from memory. The endpoints are documented; the component values are not. [rest-api.md](rest-api.md) has a catalogue of verified shapes.
