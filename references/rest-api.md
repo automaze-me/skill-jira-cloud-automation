@@ -19,6 +19,8 @@ Base URL: `https://api.atlassian.com/automation/public/jira/<cloudId>/rest/v1`. 
 - **`GET` hands out the webhook secret.** An incoming-webhook trigger comes back with its `webhookToken` in clear text. Filter it out of anything you print, log or commit.
 - **Keep secrets out of your tooling.** Create a webhook rule in the editor with only its trigger, so the editor generates URL and secret and a person stores them. Then `PUT` the steps onto it, echoing the trigger as read.
 - **Create rules disabled** (`"state": "DISABLED"`) and let a person switch them on after reviewing them in the editor.
+- **A rule across several spaces** takes several project ARIs in `ruleScopeARIs`. Jira then sets the trigger's `eventFilters` to every space in the scope, whatever you sent, and keeps its own order. So the trigger listens in all of them, and a comparison has to treat `eventFilters` as a set.
+- **Error answers are thin.** A rule with only a trigger gets 400 "Automation rule must contain at least one valid condition or action"; one with only conditions, 400 "...at least one valid action". A malformed component usually gets a **500 with an empty body**. Find it by bisecting: post disabled throwaway rules with the first *n* components, delete each one created, and the first *n* that fails names the culprit.
 - **Editor deep link** (seen on a service space): `https://<site>.atlassian.net/jira/servicedesk/projects/<KEY>/settings/automate#/rule/<uuid>`. The path segment is `automate`, not `automation`. An optional `/<componentId>` at the end selects a step.
 
 ## Finding a component's JSON: the probe rule
@@ -27,7 +29,7 @@ Atlassian documents the endpoints but not the shape of each component's `value`,
 
 ## Component catalogue
 
-`component` is `TRIGGER`, `CONDITION`, `CONDITION_BLOCK` or `ACTION`. Shapes are trimmed to the keys that matter; send `schemaVersion` as shown.
+`component` is `TRIGGER`, `CONDITION`, `CONDITION_BLOCK`, `BRANCH` or `ACTION`. A branch sent as `ACTION` gets the empty 500. Shapes are trimmed to the keys that matter; send `schemaVersion` as shown.
 
 ### Triggers
 
@@ -55,10 +57,10 @@ Atlassian documents the endpoints but not the shape of each component's `value`,
 | `type` | `schemaVersion` | `value` |
 |---|---|---|
 | `codebarrel.action.log` | 1 | the message as a plain string |
-| `jira.create.variable` | 1 | `{"name": {"type": "FREE", "value": "myVar"}, "type": "SMART", "query": {"type": "SMART", "value": "{{...}}"}, "lazy": false}` |
+| `jira.create.variable` | 1 | `{"id": "_customsmartvalue_id_1793400000101", "name": {"type": "FREE", "value": "myVar"}, "type": "SMART", "query": {"type": "SMART", "value": "{{...}}"}, "lazy": false}`. The **`id` is required** and must be unique in the rule; without it the API answers an empty 500. The editor writes `_customsmartvalue_id_<epoch millis>`; any fixed number in that form works. |
 | `jira.create.mapping-variable` | 1 | Create lookup table: `{"name": {"type": "FREE", "value": "table"}, "mappings": [{"key": "a", "value": "b"}]}`, read as `{{table.get("a")}}` |
 | `jira.lookup.issues` | -1 | `{"id": "<any id>", "name": {"type": "FREE", "value": "lookupIssues"}, "type": "JQL", "query": {"type": "SMART", "value": "<JQL>"}, "lazy": false}` |
-| `jira.issue.related` | 1 | Branch: `{"relatedType": "created", "jql": null, "linkTypes": [], "onlyUpdatedIssues": false, "similarityLimit": 40, "compareValue": 0}`; `relatedType` is also `jql`, linked work items and so on. The steps of the branch go in `children`. |
+| `jira.issue.related` | 1 | Branch, `component: "BRANCH"`: `{"relatedType": "created", "jql": null, "linkTypes": [], "onlyUpdatedIssues": false, "similarityLimit": 40, "compareValue": 0}`; `relatedType` is also `jql`, linked work items and so on. The steps of the branch go in `children`. |
 | `jira.issue.create` | 12 | `{"operations": [{"field": {"type": "ID", "value": "project"}, "fieldType": "project", "type": "SET", "value": {"type": "ID", "value": "<projectId>"}}, ...], "advancedFields": "<JSON as a string>", "sendNotifications": true}`. Fields without an operation go into `advancedFields`, e.g. `{"fields": {"security": {"name": "<level>"}, "customfield_<n>": "<request type id>"}}` for the security level and the JSM request type, where `customfield_<n>` is the site's Request Type field. |
 | `jira.issue.edit` | 12 | `{"operations": [{"field": {"type": "NAME", "value": "<field>"}, "fieldType": "<field type key>", "type": "SET", "value": "..."}], "advancedFields": null, "sendNotifications": true}` |
 | `jira.issue.comment` | 2 | `{"comment": "...", "publicComment": false, "commentVisibility": null, "sendNotifications": true, "addCommentOnce": true}`; `publicComment: false` makes it internal on a service space |
