@@ -13,6 +13,11 @@ Base URL: `https://api.atlassian.com/automation/public/jira/<cloudId>/rest/v1`. 
 | `POST /rule` | Creates a rule from `{"rule": {...}}` in the format GET returns. **Needs `authorAccountId`** (the caller's, from `/rest/api/3/myself`); without it the answer is a bare 400 "could not be parsed" with no hint. |
 | `PUT /rule/<uuid>` | Replaces the rule. Send the live trigger back unchanged and it survives, including an incoming webhook's URL and secret. Set `state` here too. |
 | `DELETE /rule/<uuid>` | Answers **415** unless the request carries `Content-Type: application/json`; send `{}` as the body. |
+| `PUT /rule/<uuid>/state` | Switches a rule on or off without touching the rest: `{"value": "ENABLED"}` or `"DISABLED"`. |
+| `POST /rule/manual/<ruleId>/invocation` | Runs a manual-trigger rule, which makes manual rules testable by script: `{"objects": ["<work item ARI>", ...], "userInputs": {"<input>": {"inputType": "TEXT", "value": "..."}}}`. Up to 50 objects, all from one space. Input types: `TEXT`, `PARAGRAPH`, `DROPDOWN`, `NUMBER`, `BOOLEAN`. |
+| `POST /rule/manual/search` | Lists the manual rules available for an object. |
+
+There is **no audit log endpoint**: why a run failed is visible only in the rule's audit log in the editor, or in the owner's error mail.
 
 - **The JSON is the export format.** What `GET /rule` returns is what the editor's export produces. On create, leave out `uuid`, `created`, `updated` and the component ids.
 - **Comparing a rule with its JSON:** drop `id`, `parentId`, `conditionParentId` and `connectionId` on both sides, which the API adds or changes. In jq: `walk(if type == "object" then del(.id, .parentId, .conditionParentId, .connectionId) else . end)`.
@@ -35,7 +40,7 @@ Atlassian documents the endpoints but not the shape of each component's `value`,
 
 | `type` | `schemaVersion` | `value` |
 |---|---|---|
-| `jira.manual.trigger.issue` | 3 | `{"inputFromUsers": true, "inputPrompts": [{"inputType": "DROPDOWN", "displayName": "who", "required": true, "variableName": "varWho", "defaultValue": ["A", "B"]}, {"inputType": "TEXT", "displayName": "email", "required": true, "variableName": "varEmail", "defaultValue": ""}], "groups": [], "issueFilter": null, "jQLFilter": null}`. A dropdown's options sit in `defaultValue`. Read inputs as `{{userInputs.varWho}}`. The editor offers short text, paragraph, dropdown, number and checkbox; only `TEXT` and `DROPDOWN` have been read back so far. |
+| `jira.manual.trigger.issue` | 3 | `{"inputFromUsers": true, "inputPrompts": [{"inputType": "DROPDOWN", "displayName": "who", "required": true, "variableName": "varWho", "defaultValue": ["A", "B"]}, {"inputType": "TEXT", "displayName": "email", "required": true, "variableName": "varEmail", "defaultValue": ""}], "groups": [], "issueFilter": null, "jQLFilter": null}`. A dropdown's options sit in `defaultValue`. Read inputs as `{{userInputs.varWho}}`. The editor offers short text, paragraph, dropdown, number and checkbox; the spec's input types are `TEXT`, `PARAGRAPH`, `DROPDOWN`, `NUMBER` and `BOOLEAN`, and `TEXT` and `DROPDOWN` have been read back from a live rule. |
 | `jira.incoming.webhook` | — | Keys `jql`, `searchOrProvide`, `webhookToken`. `searchOrProvide: "none"` is the editor's "No work items from the webhook"; `"provided"` expects work items in the POST body. Payload fields read as `{{webhookData.<key>}}`. |
 | `jira.jql.scheduled` | 1 | `{"schedule": {"method": "BASIC", "rRule": "BEGIN:VEVENT\nDTSTART;TZID=America/Los_Angeles:20261027T060000\nRRULE:FREQ=DAILY;BYHOUR=6;BYMINUTE=0;BYSECOND=0;INTERVAL=1\nEND:VEVENT\n", "cronExpression": "", "rate": 0, "rateInterval": 86400}, "jql": "...", "executionMode": "jql", "onlyUpdatedIssues": false}`. The time zone lives in the `TZID` of the RRULE. |
 | `jira.issue.field.changed` | 2 | `{"eventFilters": ["ari:cloud:jira:<cloudId>:project/<projectId>"], "changeType": "VALUE_ADDED", "fields": [{"type": "fieldName", "value": "<field name>"}], "actions": []}` |
