@@ -44,6 +44,8 @@ Branching re-points `{{issue}}` at a *related* set of items — subtasks, parent
 - `{{issue}}` = the branched item
 - `{{triggerIssue}}` = the original trigger item
 - the trigger's own smart values stay readable: `{{comment.body}}` under *Work item commented*, in a JQL branch (run, 2026-11)
+- `{{triggerIssue.key}}` renders the trigger item's key in a JQL branch under *Work item commented*; `{{comment.url}}` and `{{comment.issue.key}}` render empty there (probe, run 2026-11)
+- a variable created in the trunk is readable inside a JQL branch below it: *Create variable* `handoffKey` = `{{issue.key}}` before the branch, `{{handoffKey}}` inside it gave the trigger's key (rule without advanced steps; probe, run 2026-11)
 - an If/else block can sit among the branch's steps (run, 2026-11)
 
 Branches over JQL or related items run **in parallel and asynchronously**. Do not assume ordering between a branch and the steps after it, and do not have two branches write the same field.
@@ -107,7 +109,7 @@ The *Add conditions to an automation flow* page says the opposite in three words
 
 ## Variables are scoped to their group — and so is `{{webResponse}}`
 
-A variable created inside a group, branch or `If/else` block is gone outside it — [AUTO-154](https://jira.atlassian.com/browse/AUTO-154), 155 votes, still open, filed as a **Suggestion** rather than a Bug. Values the trigger provides are not affected: `{{comment}}` reads fine inside a branch (see [Branches](#branches)). The sanctioned mechanism for crossing a group boundary is the group's own **inputs and outputs**.
+A variable created inside a group, branch or `If/else` block is gone outside it — [AUTO-154](https://jira.atlassian.com/browse/AUTO-154), 155 votes, still open, filed as a **Suggestion** rather than a Bug. Values the trigger provides are not affected: `{{comment}}` reads fine inside a branch (see [Branches](#branches)). Nor is the way in: a trunk variable reaches a branch below it (see [Branches](#branches)); what dies is a variable created *inside* a block, outside that block. The sanctioned mechanism for crossing a group boundary is the group's own **inputs and outputs**.
 
 **`{{webResponse}}` obeys the same rule, in the direction that hurts.** A Send web request in the trunk populates it; a branch below cannot read it. Measured on a live tenant with two Log actions, one step apart:
 
