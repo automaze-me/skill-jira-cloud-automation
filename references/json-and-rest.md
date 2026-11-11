@@ -56,7 +56,7 @@ Examples assume: fix versions `Version 2.0` (id 10046) and `Version 3.0` (id 100
 
 Available under **More options** on: Clone work item, Create work item, Create JSM request, Edit work item, Transition work item.
 
-Only reach for it when a field cannot be set through *Choose fields to set* — typically third-party custom fields.
+Only reach for it when a field cannot be set through *Choose fields to set* — typically third-party custom fields. When writing rule JSON through the REST API, *Choose fields to set* is the `operations` array; its shapes per field type are in [rest-api.md](rest-api.md#field-operations). Several things below that look like they need advanced JSON have operations: the security level (also from a smart value), linked work items, and copying a field from the trigger work item. The JSM request type is the one field neither route offers in the editor: use the *Edit request type* action (`jira.edit.request.type`), or `customfield_<n>` in advanced JSON.
 
 ### `update` vs `fields`
 
@@ -85,6 +85,8 @@ GET /rest/api/3/issue/{issueIdOrKey}/editmeta
 ```
 
 The response gives each field's `schema`, its permitted `operations` (`set` / `add` / `remove`), and `allowedValues`. If a field is **absent** from that response, the rule will fail at runtime — the field is missing from the relevant create/edit **screen**, or the rule actor lacks permission. Fix the screen, not the JSON.
+
+On a site that runs Atlassian's **field schemes** (2026), the space's field scheme decides too: a field is available in a space only when that scheme lists it, the scheme can restrict it to some work types, and a new custom field joins no scheme automatically (docs, 2026-10). Not yet seen as a rule failure; check it alongside the screen.
 
 ### Referencing fields
 
@@ -118,6 +120,8 @@ Let the JSON functions build the structure rather than hand-writing quotes:
 ```
 
 All three work; the second is preferred — correct shape *and* correct escaping in one step.
+
+**Multi-line text does not survive `jsonEncode` here.** `{"fields": {"description": "{{issue.customfield_<n>.jsonEncode}}"}}` stored the value with a literal `\n` where each line break was (seen on two created work items, 2026-11). Line breaks typed into the JSON template as `\n` came out right. Set a multi-line field with a field operation (`"value": "{{issue.customfield_<n>}}"`) instead; a multi-line paragraph field copied into `description` that way kept its line breaks (run, 2026-11). The same happens to a manual trigger's paragraph input: `"customfield_<n>": "{{userInputs.<input>.jsonEncode}}"` stored a two-line answer with a literal `\n`, and every step that later read the field showed it (comment, description, mail; run, 2026-11).
 
 Arrays:
 
@@ -179,10 +183,22 @@ Append a user to a multi-user picker:
 { "update": { "customfield_12346": [ { "add": { "id": "{{reporter.accountId}}" } } ] } }
 ```
 
-Set security level:
+Set security level (on Create and Edit, the *Security Level* field in *Choose fields to set* does this without JSON, and takes a smart value):
 
 ```json
 { "update": { "security": [ { "set": { "name": "Public" } } ] } }
+```
+
+Set the reporter, e.g. to a customer that *Add service project customer* created earlier in the rule (run, 2026-11; no field-operation shape on record):
+
+```json
+{ "fields": { "reporter": { "id": "{{customer.accountId}}" } } }
+```
+
+Clear fields (select, text and paragraph fields; run, 2026-11):
+
+```json
+{ "fields": { "customfield_<n>": null, "customfield_<m>": null } }
 ```
 
 Set a single-select during an edit (note the array wrapper under `update`):
@@ -191,7 +207,7 @@ Set a single-select during an edit (note the array wrapper under `update`):
 { "update": { "Single Select": [ { "set": { "value": "green" } } ] } }
 ```
 
-Link work items — look up link type names at `<site>/secure/admin/ViewLinkTypes!default.jspa`:
+Link work items (on Create, the *Linked work items* field does this without JSON; operation shape in [rest-api.md](rest-api.md#field-operations)) — look up link type names at `<site>/secure/admin/ViewLinkTypes!default.jspa`:
 
 ```json
 {
@@ -208,6 +224,8 @@ JSM request participants:
 ```json
 { "update": { "Request participants": [ { "add": { "id": "{{issue.comments.last.author.accountId}}" } } ] } }
 ```
+
+Know what a participant sees before a rule adds one (docs, 2026-08). In the portal: the whole public request, meaning the form as submitted, attachments, and every public comment including those posted before they were added. The reporter's view lists them under *Shared with*, which by itself tells the reporter that someone else is involved. Their email notifications cover only activity after they were added. A security level cannot grant participants access ([KB](https://support.atlassian.com/jira/kb/set-up-issue-security-for-request-participants-using-automation/)).
 
 Log work, optionally with a calculated duration:
 
@@ -232,7 +250,7 @@ In order of likelihood:
 1. **Stale `{{issue}}`** — an earlier step changed the value but `{{issue}}` still holds trigger-time data. Insert **Re-fetch work item data**.
 2. **Field copying from itself while empty** — produces no change. Guard with a default or use a different source field.
 3. **Rule actor lacks permission** to view or edit the field in that project.
-4. **Field not on the create/edit screen** — confirm via `createmeta` / `editmeta`.
+4. **Field not on the create/edit screen**, or not in the space's field scheme for that work type — confirm via `createmeta` / `editmeta`.
 5. The smart value resolved to empty and you wrote an empty string over real data.
 
 The editor warning *"Valid JSON but smart value can't be validated"* is **expected** — smart values can only resolve at runtime. Read the audit log after the first execution.
@@ -287,3 +305,17 @@ X-ExperimentalApi: opt-in
 - Matching an `accountId` through `query` is undocumented (the docs describe `query` as matching name and email). The same behaviour holds on `/rest/api/3/user/search?query=<accountId>`, which suggests a shared search backend rather than a fluke.
 
 Three sibling routes return the user **without** `emailAddress`, all verified on the same token and account: `/rest/api/3/user?accountId=`, `/rest/api/3/user/bulk?accountId=`, and `/rest/api/3/user/search?accountId=`. Only the `query=` form carries it. `/rest/api/3/user/email` is the documented endpoint for this and needs a scope most tokens lack; it is also limited to managed accounts, so it will not help for external customers.
+
+## JSM email replies
+
+A rule that copies an emailed answer from one request onto another work item depends on whose mail threads. Observed on a service space whose customers are only those agents add (run, 2026-11):
+
+| Who replies under the request's subject, key included | What JSM does |
+|---|---|
+| the request's reporter | a public comment by the reporter; *Work item commented* fires with `{{comment.author}}` = the reporter |
+| a participant | threads as well (docs; not run here) |
+| an agent, from their own mailbox | a public comment by that agent |
+| a customer of the space who is not on the request | a **new request** of the email channel's request type, not linked to the first |
+| an address that is not a customer of the space | **dropped**: no request, no comment, nothing in a queue |
+
+To copy only the outside person's answer, condition on `{{comment.author.accountId}}` equals `{{issue.reporter.accountId}}`. A question mailed to a group address breaks this: members answer from their own addresses and land in the last three rows. Plan for it before relying on the loop, by making each member a customer and a participant of that request, or by copying every public comment with its author named (neither tested here).

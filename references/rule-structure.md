@@ -35,12 +35,16 @@ The **`{{smart values}}` condition** (a.k.a. Advanced compare) is the workhorse 
 
 **If/else block** is the only way to get real branching logic on the standard plans — everything below it in the block runs only when its condition matches.
 
+Unverified: under *Work item created* a JQL condition may not yet find the new work item (search index lag); a work item fields or smart-value condition avoids the question.
+
 ## Branches
 
 Branching re-points `{{issue}}` at a *related* set of items — subtasks, parent, epic, stories, linked issues, or a JQL result set. Inside a branch:
 
 - `{{issue}}` = the branched item
 - `{{triggerIssue}}` = the original trigger item
+- the trigger's own smart values stay readable: `{{comment.body}}` under *Work item commented*, in a JQL branch (run, 2026-11)
+- an If/else block can sit among the branch's steps (run, 2026-11)
 
 Branches over JQL or related items run **in parallel and asynchronously**. Do not assume ordering between a branch and the steps after it, and do not have two branches write the same field.
 
@@ -103,7 +107,7 @@ The *Add conditions to an automation flow* page says the opposite in three words
 
 ## Variables are scoped to their group — and so is `{{webResponse}}`
 
-A variable created inside a group, branch or `If/else` block is gone outside it — [AUTO-154](https://jira.atlassian.com/browse/AUTO-154), 155 votes, still open, filed as a **Suggestion** rather than a Bug. The sanctioned mechanism for crossing a group boundary is the group's own **inputs and outputs**.
+A variable created inside a group, branch or `If/else` block is gone outside it — [AUTO-154](https://jira.atlassian.com/browse/AUTO-154), 155 votes, still open, filed as a **Suggestion** rather than a Bug. Values the trigger provides are not affected: `{{comment}}` reads fine inside a branch (see [Branches](#branches)). The sanctioned mechanism for crossing a group boundary is the group's own **inputs and outputs**.
 
 **`{{webResponse}}` obeys the same rule, in the direction that hurts.** A Send web request in the trunk populates it; a branch below cannot read it. Measured on a live tenant with two Log actions, one step apart:
 
@@ -154,6 +158,7 @@ That field holds every matching object, so an AQL matching two objects assigns n
 | **Re-fetch work item data** | refreshes `{{issue}}`; required after any step whose result a later step must read |
 | **Send web request** | outbound HTTP; enable *Wait for response* for `{{webResponse}}` |
 | **Re-fetch alert data** | same as re-fetch, for `{{alert}}`; runs in the background |
+| **Transition work item** | needs a transition from the current status to the target and does not route through other statuses, so a move over two transitions is two steps (assumed from the workflow; the two-step version passed its run, 2026-11). Rules act after the event, so none can block a transition; use a workflow validator |
 
 ## Service limits
 
@@ -176,16 +181,25 @@ Note the compounding rule on associated items: a scheduled trigger fetching 100 
 
 Also note **Lookup issues (100)** ≠ **scheduled JQL search (999)**. Different ceilings, both silent.
 
+### Billing: steps from 2026-12-03
+
+Automation is metered in **steps** (docs, checked 2026-10): every trigger, condition, action and branch that runs counts. JSM Standard includes 3,000 steps per agent per month, pooled across the organisation. Past that, extra usage costs $0.50 per 1,000 steps if it is switched on; otherwise rules pause. Single-project rules count too. The model before counted executions (1,700 a month on Jira Standard) and left single-project rules out ([service limits](https://support.atlassian.com/cloud-automation/docs/automation-service-limits/)), so older designs that relied on that need rechecking.
+
+Cheap rules: conditions ahead of actions, filters on the trigger, schedules no more often than needed, branches only where the flow forks.
+
 ## Permissions and the rule actor
 
 Rules run as the **rule actor** — by default *Automation for Jira*, changeable per rule. Everything the rule does is subject to that user's permissions: browse, edit, transition, field-level visibility, and issue security.
 
 Symptoms of an actor permission problem: rule reports success, nothing changed; fields come back empty that are populated in the UI; `createmeta`/`editmeta` omits a field you can see.
 
+- **The actor and issue security.** *Automation for Jira* gets its project access through the `atlassian-addons-project-access` project role. A security level that grants neither that role nor the actor hides its work items from the rule, and setting a level needs *Set Issue Security* for the role ([KB](https://support.atlassian.com/automation/kb/automation-or-set-issue-security-level-via-automation-for-jira/)). Granting *Set Issue Security* only to admins and that role lets rules set levels that agents cannot (run, 2026-11). On JSM, a level hides a request from its own reporter unless it grants Reporter ([KB](https://support.atlassian.com/jira/kb/a-service-management-request-is-not-visible-in-the-customer-portal-due-to-a-security-level-set-in-the-request/)), and it cannot grant request participants at all ([KB](https://support.atlassian.com/jira/kb/set-up-issue-security-for-request-participants-using-automation/)).
+- **A rule scoped to more than one space needs Administer Jira** to create or edit (docs, checked 2026-10).
+
 ## Debugging checklist
 
 1. **Audit log first** — every execution, its outcome, and per-action detail. Filter by rule.
-2. **Log action** with the suspect smart value, on a manual trigger.
+2. **Log action** with the suspect smart value, on a manual trigger. A scheduled rule runs at once with **Run rule** in the editor.
 3. **Stale data?** Insert Re-fetch work item data.
 4. **Empty value?** Add a `|"fallback"` default and re-run to distinguish "empty" from "wrong path".
 5. **Permission?** Temporarily switch the rule actor to a site admin to confirm, then fix properly.

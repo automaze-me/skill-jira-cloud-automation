@@ -236,6 +236,14 @@ project = {{issue.project.key}} AND created >= "{{now.minusDays(7).jqlDate}}" AN
 
 Quote anything that can contain spaces, and `urlEncode` it if the JQL is going into a URL rather than a JQL field.
 
+`~` on a text field is a word search. To find a key or an address held in a text field, search the phrase with inner quotes:
+
+```
+project = <KEY> AND "<field name>" ~ "\"{{webhookData.someKey}}\""
+```
+
+In rule JSON that string reads `"project = <KEY> AND \"<field name>\" ~ \"\\\"{{webhookData.someKey}}\\\"\""`. Used as a Lookup issues duplicate check (run, 2026-10 and 2026-11).
+
 ---
 
 ## 10. Read headers out of an attached `.eml`
@@ -295,4 +303,5 @@ Rules re-fire more often than expected — an edit by another rule, a bulk chang
 - Label as a sentinel: condition *labels does not contain* `auto-processed`, then add it in the same run
 - Compare before writing with the `{{smart values}}` condition
 - Check `{{issue.comments}}` for a marker string before commenting again
+- Before creating, **Lookup issues** for one carrying the same external key (phrase match, see 9), and stop on `{{lookupIssues.size|0}}` not equal to `0`
 - Watch the **loop detection limit (10)** — a rule that edits an item it also triggers on will be stopped and marked LOOP

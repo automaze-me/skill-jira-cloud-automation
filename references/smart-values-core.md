@@ -137,7 +137,7 @@ The changed field, anywhere smart values are supported.
 
 ### `{{comment}}`
 
-**Issue commented trigger only.** Silently empty under every other trigger, including transitions that happen to add a comment.
+**Issue commented trigger only.** Silently empty under every other trigger, including transitions that happen to add a comment. Under that trigger it stays readable inside a branch, unlike a variable (run, 2026-11).
 
 `comment.body`, `.author`, `.created`, `.internal` (false = customer-visible in JSM), `.visibility.type`, `.visibility.value`, `.properties`, `.properties."sd.public.comment".internal`.
 
