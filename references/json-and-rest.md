@@ -225,6 +225,8 @@ JSM request participants:
 { "update": { "Request participants": [ { "add": { "id": "{{issue.comments.last.author.accountId}}" } } ] } }
 ```
 
+Run (2026-11) with the field id and a customer the rule had just added: `{"update": {"customfield_<participants field>": [{"add": {"id": "{{customer.accountId}}"}}]}}`, in a branch over the created request, after *Add service project customer* for that address. The field must be on the request's edit screen.
+
 Know what a participant sees before a rule adds one (docs, 2026-08). In the portal: the whole public request, meaning the form as submitted, attachments, and every public comment including those posted before they were added. The reporter's view lists them under *Shared with*, which by itself tells the reporter that someone else is involved. Their email notifications cover only activity after they were added. A security level cannot grant participants access ([KB](https://support.atlassian.com/jira/kb/set-up-issue-security-for-request-participants-using-automation/)).
 
 Log work, optionally with a calculated duration:
@@ -318,4 +320,4 @@ A rule that copies an emailed answer from one request onto another work item dep
 | a customer of the space who is not on the request | a **new request** of the email channel's request type, not linked to the first |
 | an address that is not a customer of the space | **dropped**: no request, no comment, nothing in a queue |
 
-To copy only the outside person's answer, condition on `{{comment.author.accountId}}` equals `{{issue.reporter.accountId}}`. A question mailed to a group address breaks this: members answer from their own addresses and land in the last three rows. Plan for it before relying on the loop, by making each member a customer and a participant of that request, or by copying every public comment with its author named (neither tested here).
+To copy only the outside person's answer, condition on `{{comment.author.accountId}}` equals `{{issue.reporter.accountId}}`. A question mailed to a group address breaks this: members answer from their own addresses and land in the last three rows. Plan for it before relying on the loop, by making each member a customer and a participant of that request, or by copying every public comment with its author named. Both are now built (run, 2026-11): the rule adds the second person as customer and participant when it creates the request, and the copy rule conditions on `{{comment.internal}}` equals `false` and names `{{comment.author.displayName}}`; a public agent comment reached the other work item, an internal one did not.

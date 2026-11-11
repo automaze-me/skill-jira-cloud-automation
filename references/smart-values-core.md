@@ -139,7 +139,7 @@ The changed field, anywhere smart values are supported.
 
 **Issue commented trigger only.** Silently empty under every other trigger, including transitions that happen to add a comment. Under that trigger it stays readable inside a branch, unlike a variable (run, 2026-11).
 
-`comment.body`, `.author`, `.created`, `.internal` (false = customer-visible in JSM), `.visibility.type`, `.visibility.value`, `.properties`, `.properties."sd.public.comment".internal`.
+`comment.body`, `.author`, `.created`, `.internal` (false = customer-visible in JSM; a condition `{{comment.internal}}` equals `false` under *Work item commented* passed a public agent comment and stopped an internal one, run 2026-11), `.visibility.type`, `.visibility.value`, `.properties`, `.properties."sd.public.comment".internal`.
 
 ### `{{webhookData}}`
 
