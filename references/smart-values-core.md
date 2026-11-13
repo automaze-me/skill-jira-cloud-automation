@@ -88,6 +88,8 @@ Sub-properties available on any custom field: `.id`, `.name` (visible label), `.
 
 Notable sub-objects: `.comments`, `.components`, `.fixVersions`, `.versions`, `.watchers`, `.parent`, `.epic`, `.security`, `.timetracking`, `.properties`, `.url`, `.affectedServices`, `.Request Type` (JSM), `.latest`.
 
+**How a JSM request came in:** `{{issue.properties."request.channel.type".value}}`, the work item property `request.channel.type`. Read back over REST (2026-11): `jira` for a work item created as an agent (agent view or `POST /rest/api/3/issue`), `api` for one raised through `POST /rest/servicedeskapi/request` on behalf of a customer; the portal and email channels give `portal` and `email`. A condition `{{issue.properties."request.channel.type".value}}` equals `jira` under *Work item created* passed the agent-created item and stopped the one raised through the service desk API (run, 2026-11). That tells an agent's "raise on behalf" mistake from a real customer request.
+
 ### `{{lookupIssues}}`
 
 Result list from the **Lookup issues** action (JQL, **max 100 items**).

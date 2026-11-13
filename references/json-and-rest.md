@@ -253,6 +253,7 @@ In order of likelihood:
 2. **Field copying from itself while empty** — produces no change. Guard with a default or use a different source field.
 3. **Rule actor lacks permission** to view or edit the field in that project.
 4. **Field not on the create/edit screen**, or not in the space's field scheme for that work type — confirm via `createmeta` / `editmeta`.
+   The REST API does not hold to the screens the same way: a user with *Modify Reporter* set `reporter` through `POST /rest/api/3/issue` and `PUT /rest/api/3/issue/<key>` on a work type whose create and edit screens both lack Reporter (run, 2026-11). Taking a field off the screens keeps it out of the UI and away from automation, not away from a REST caller.
 5. The smart value resolved to empty and you wrote an empty string over real data.
 
 The editor warning *"Valid JSON but smart value can't be validated"* is **expected** — smart values can only resolve at runtime. Read the audit log after the first execution.
