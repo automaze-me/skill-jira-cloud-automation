@@ -229,6 +229,15 @@ Run (2026-11) with the field id and a customer the rule had just added: `{"updat
 
 Know what a participant sees before a rule adds one (docs, 2026-08). In the portal: the whole public request, meaning the form as submitted, attachments, and every public comment including those posted before they were added. The reporter's view lists them under *Shared with*, which by itself tells the reporter that someone else is involved. Their email notifications cover only activity after they were added. A security level cannot grant participants access ([KB](https://support.atlassian.com/jira/kb/set-up-issue-security-for-request-participants-using-automation/)).
 
+**Letting one participant through a security level** (run, 2026-11). Jira refuses Request participants as a level holder, but accepts an ordinary user picker. So the rule that adds the participant also writes them into a user picker field, and the level holds that field. Only the person in the field gets in, not someone added as a participant by hand. Atlassian's other route, the holder *Service project customer - portal access*, lets in every participant. One edit step does both, and both fields must be on the request's edit screen:
+
+```json
+{ "fields": { "customfield_<user picker>": { "accountId": "{{customer.accountId}}" } },
+  "update": { "customfield_<participants field>": [ { "add": { "id": "{{customer.accountId}}" } } ] } }
+```
+
+Holder through REST: `PUT /rest/api/3/issuesecurityschemes/{schemeId}/level/{levelId}/member` with `{"members": [{"type": "userCF", "parameter": "customfield_<n>"}]}` (also inside `levels[].members` on `POST /rest/api/3/issuesecurityschemes`). `userCustomField` as the write type is refused ("isn't a valid type"), and so is the participants field as the parameter ("isn't a valid parameter"). Reads return the same holder as `holder.type: "userCustomField"`, so map the two before comparing. Remove a holder with `DELETE /rest/api/3/issuesecurityschemes/{schemeId}/level/{levelId}/member/{memberId}`; the member id comes from `GET .../{schemeId}/members`.
+
 Log work, optionally with a calculated duration:
 
 ```json
@@ -321,6 +330,8 @@ A rule that copies an emailed answer from one request onto another work item dep
 | a customer of the space who is not on the request | a **new request** of the email channel's request type, not linked to the first |
 | an address that is not a customer of the space | **dropped**: no request, no comment, nothing in a queue |
 | the request's reporter, set from a site Atlassian account that lacks the JSM **Customer** role (and so is no customer of the space) | **refused**: the sender gets "Your request to <space> could not be created"; no comment, no request |
+
+**The bounce carries no reason; the email log does.** "Your request to <space> could not be created" is all the sender sees. The reason sits in the space's email log (Space settings → Email requests, logs). "Customers aren't allowed to self-signup for your help center. Either invite the customer or update your settings." means JSM did not match the sender to an existing customer of the space, so the mail never reached a permission check (run, 2026-11: two such bounces were first read as a security-level gap). Read the log before changing permissions.
 
 **Add service project customer does not make an existing site account a customer** (run, 2026-11). For an address that already has an Atlassian account on the site (a colleague with only Jira Software, say), the action logs `Customer already exists: <email>` and the rule continues: `{{customer.accountId}}` resolves to that account, so setting it as reporter works, but the account does not join the space's customer list. In a space where only roles and *Service project customer - portal access* hold Browse projects, Add comments and Create, that person can then neither see the request nor reply to it by mail. Cause ([KB](https://support.atlassian.com/jira/kb/agents-dont-have-permission-to-invite-customers-to-service-project/)): a site account must hold the JSM Customer role (free) before it can be a customer, and only a user access admin or site admin assigns it, per user or through a group's product access. Tests that ask only new addresses (the action creates them as portal-only customers) or agents (who hold a role) never hit this. `POST /rest/api/3/permissions/check` (Administer Jira) cannot confirm a fix: it does not evaluate customers' portal access, and returned no Browse projects or Add comments on the request even for its portal-only reporter, whose mailed replies do thread (run, 2026-11). Test with a real mail from the person, or an address you control in the same situation.
 
